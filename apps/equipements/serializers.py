@@ -95,13 +95,19 @@ class DeviceTypeSerializer(serializers.ModelSerializer):
 # ============================================================================
 
 class OLTListSerializer(serializers.ModelSerializer):
-    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
-    site_name = serializers.CharField(source='site.name', read_only=True)
+    vendor_name    = serializers.CharField(source='vendor.name', read_only=True)
+    site_name      = serializers.CharField(source='site.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    # Annotated in OLTViewSet.get_queryset() — count of online ONTs for this OLT
+    ont_count      = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = OLT
-        fields = ['id', 'hostname', 'ip_address', 'vendor_name', 'site_name', 'status', 'status_display']
+        fields = [
+            'id', 'hostname', 'ip_address', 'vendor_name', 'site_name',
+            'status', 'status_display', 'snmp_version', 'max_pon_ports',
+            'last_polled_at', 'ont_count',
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'deleted_at']
 
 
@@ -289,16 +295,20 @@ class CustomerSerializer(serializers.ModelSerializer):
 # ============================================================================
 
 class ONTListSerializer(serializers.ModelSerializer):
-    olt_hostname = serializers.CharField(source='olt.hostname', read_only=True)
-    gpon_port_name = serializers.CharField(source='gpon_port.port_name', read_only=True)
+    olt_hostname        = serializers.CharField(source='olt.hostname', read_only=True)
+    gpon_port_name      = serializers.CharField(source='gpon_port.port_name', read_only=True)
     customer_id_display = serializers.CharField(source='customer.customer_id', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    status_display      = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = ONT
         fields = [
-            'id', 'serial_number', 'olt_hostname', 'gpon_port_name', 'status',
-            'status_display', 'customer_id_display'
+            'id', 'serial_number', 'mac_address', 'ip_address',
+            'olt_hostname', 'gpon_port_name', 'ont_index',
+            'status', 'status_display',
+            'rx_power', 'tx_power', 'distance_km',
+            'service_type', 'last_seen_at',
+            'customer_id_display',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'deleted_at']
 

@@ -239,7 +239,7 @@ class DeviceTypeViewSet(viewsets.ModelViewSet):
 class OLTViewSet(viewsets.ModelViewSet):
     queryset = OLT.objects.select_related(
         'vendor', 'device_type', 'site', 'rack', 'gouvernorat', 'delegation', 'created_by'
-    )
+    ).annotate(ont_count=Count('onts', filter=Q(onts__status='online', onts__deleted_at__isnull=True)))
     permission_classes = [IsAuthenticated, CanViewOLT]
     pagination_class = StandardPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]

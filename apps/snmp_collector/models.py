@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.postgres.indexes import BrinIndex
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 from apps.core.models import BaseModel, SoftDeleteModel
 from apps.equipements.models import OLT, NetworkInterface, GponPort, ONT, Vendor, DeviceType
@@ -95,7 +96,7 @@ class MetricHistory(BaseModel):
 
     raw_value = models.TextField(blank=True)
     numeric_value = models.FloatField(null=True, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
         db_table = "metric_history"

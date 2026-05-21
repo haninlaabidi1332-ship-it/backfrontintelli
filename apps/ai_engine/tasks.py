@@ -93,18 +93,22 @@ def train_model(model_id, data_start, data_end):
         if not metrics.exists():
             raise ValueError("Pas assez de données pour l'entraînement")
 
-        # Transformation en DataFrame
+        # Transformation en DataFrame (format long → pivot wide)
+        # On tronque le timestamp à la seconde pour aligner les OIDs du même cycle de polling
         data = []
         for metric in metrics:
             data.append({
-                'olt_id': metric.olt_id,
-                'timestamp': metric.timestamp,
-                metric.oid.name: metric.numeric_value
+                'olt_id': str(metric.olt_id),
+                'timestamp': metric.timestamp.replace(microsecond=0),
+                'oid_name': metric.oid.name,
+                'value': metric.numeric_value
             })
         df = pd.DataFrame(data)
         # Pivot pour avoir une colonne par feature
-        df_pivot = df.pivot_table(index=['olt_id', 'timestamp'], columns='oid_name', values='value').reset_index()
-        X = df_pivot[features].dropna()
+        df_pivot = df.pivot_table(index=['olt_id', 'timestamp'], columns='oid_name', values='value', aggfunc='mean').reset_index()
+        df_pivot.columns.name = None
+        available_features = [f for f in features if f in df_pivot.columns]
+        X = df_pivot[available_features].dropna()
 
         if len(X) < 100:
             raise ValueError(f"Données insuffisantes : {len(X)} échantillons (min 100 requis)")
