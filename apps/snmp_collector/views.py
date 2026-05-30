@@ -74,7 +74,7 @@ class DeviceProfileViewSet(viewsets.ModelViewSet):
 
 
 class MetricHistoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = MetricHistory.objects.select_related('olt', 'oid', 'interface', 'ont')
+    queryset = MetricHistory.objects.select_related('olt', 'oid', 'interface')
     serializer_class = MetricHistorySerializer
     permission_classes = [IsAuthenticated, CanViewSNMPMetrics]
     pagination_class = LargeResultsPagination
@@ -90,8 +90,6 @@ class MetricHistoryViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(oid__name=oid_name)
         if interface_id := params.get('interface'):
             qs = qs.filter(interface_id=interface_id)
-        if ont_id := params.get('ont'):
-            qs = qs.filter(ont_id=ont_id)
         if hours := params.get('hours'):
             try:
                 since = timezone.now() - timedelta(hours=float(hours))
@@ -138,18 +136,21 @@ class MetricHistoryViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='latest')
     def latest(self, request):
-        olt_id = request.query_params.get('olt')
-        if not olt_id:
-            return error_response("Paramètre 'olt' requis.", status_code=400)
         from django.db.models import OuterRef, Subquery
-        latest_ids = MetricHistory.objects.filter(
-            olt_id=olt_id, oid=OuterRef('oid')
+        olt_id = request.query_params.get('olt')
+        base = MetricHistory.objects.all()
+        if olt_id:
+            base = base.filter(olt_id=olt_id)
+        latest_ids = base.filter(
+            olt=OuterRef('olt'), oid=OuterRef('oid')
         ).order_by('-timestamp').values('id')[:1]
         metrics = MetricHistory.objects.filter(
-            id__in=Subquery(latest_ids), olt_id=olt_id
-        ).select_related('oid')
+            id__in=Subquery(latest_ids)
+        ).select_related('oid', 'olt')
+        if olt_id:
+            metrics = metrics.filter(olt_id=olt_id)
         serializer = MetricHistorySerializer(metrics, many=True)
-        return success_response(serializer.data, "Dernières métriques")
+        return success_response(serializer.data, "Latest metrics")
 
 
 class PollJobViewSet(viewsets.ReadOnlyModelViewSet):

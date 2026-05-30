@@ -98,15 +98,12 @@ class OLTListSerializer(serializers.ModelSerializer):
     vendor_name    = serializers.CharField(source='vendor.name', read_only=True)
     site_name      = serializers.CharField(source='site.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    # Annotated in OLTViewSet.get_queryset() — count of online ONTs for this OLT
-    ont_count      = serializers.IntegerField(read_only=True, default=0)
-
     class Meta:
         model = OLT
         fields = [
             'id', 'hostname', 'ip_address', 'vendor_name', 'site_name',
             'status', 'status_display', 'snmp_version', 'max_pon_ports',
-            'last_polled_at', 'ont_count',
+            'last_polled_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'deleted_at']
 
@@ -143,6 +140,9 @@ class OLTDetailSerializer(serializers.ModelSerializer):
 
 
 class OLTCreateUpdateSerializer(serializers.ModelSerializer):
+    # asset_tag is unique but optional — auto-generate if blank on create
+    asset_tag = serializers.CharField(required=False, allow_blank=True)
+
     class Meta:
         model = OLT
         fields = [
@@ -158,6 +158,13 @@ class OLTCreateUpdateSerializer(serializers.ModelSerializer):
             'max_pon_ports', 'max_onts_per_port',
             'status', 'description'
         ]
+
+    def validate_asset_tag(self, value):
+        import uuid
+        # If blank, generate a unique tag so the unique constraint never fires
+        if not value:
+            return f"AUTO-{uuid.uuid4().hex[:8].upper()}"
+        return value
 
 
 # ============================================================================

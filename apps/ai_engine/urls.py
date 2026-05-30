@@ -1,3 +1,4 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 from . import views
 
@@ -8,4 +9,6 @@ router.register('predictions', views.PredictionViewSet)
 router.register('training-jobs', views.TrainingJobViewSet)
 router.register('inference-logs', views.InferenceLogViewSet)
 
-urlpatterns = router.urls
+urlpatterns = router.urls + [
+    path('ask/', views.ask_ai, name='ai-ask'),
+]

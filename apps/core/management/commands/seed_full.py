@@ -56,7 +56,7 @@ class Command(BaseCommand):
             self._seed_boards_and_interfaces()
             self._seed_gpon_ports()
             self._seed_customers()
-            self._seed_onts()
+            # self._seed_onts()
             self._seed_hardware()
             self._seed_splitters()
             self._seed_config_backups()
@@ -210,8 +210,8 @@ class Command(BaseCommand):
                 defaults={
                     "name": name, "city": city, "gouvernorat": gov,
                     "latitude": lat, "longitude": lon, "code_postal": cp,
-                    "address": f"Zone Industrielle Télécom, {city}, Tunisie",
-                    "contact_name": "Équipe NOC SOTETEL",
+                    "address": f"Telecom Industrial Zone, {city}, Tunisia",
+                    "contact_name": "SOTETEL NOC Team",
                     "contact_phone": "+216 71 000 000",
                 },
             )
@@ -229,7 +229,7 @@ class Command(BaseCommand):
                     code=f"{site.code}-RACK-{i:02d}",
                     defaults={
                         "site": site, "name": f"Baie {i:02d}", "total_units": 42,
-                        "room": "Salle Technique A" if i == 1 else "Salle Extension B",
+                        "room": "Technical Room A" if i == 1 else "Extension Room B",
                         "row": f"R{i}", "position": f"{i}",
                     },
                 )
@@ -283,7 +283,7 @@ class Command(BaseCommand):
                 36.8190, 10.1658,
                 date(2021, 8, 15), date(2024, 8, 14), date(2028, 8, 14),
                 "SOTETEL-MAIN-2021",
-                "OLT agrégateur HQ Tunis — gestion, supervision et ONTs tests NOC.",
+                "HQ Tunis aggregator OLT, management, supervision and NOC testing.",
             ),
             (
                 "OLT-SFAX-01",
@@ -293,7 +293,7 @@ class Command(BaseCommand):
                 34.7406, 10.7603,
                 date(2022, 3, 5), date(2025, 3, 4), date(2029, 3, 4),
                 "SOTETEL-SFX-2022",
-                "OLT principal Branch Sfax — dessert 12 ports actifs, ~450 abonnés FTTH résidentiel et entreprise.",
+                "Main OLT Branch Sfax, 12 active ports, ~450 residential and enterprise FTTH subscribers.",
             ),
             (
                 "OLT-ELKEF-01",
@@ -303,7 +303,7 @@ class Command(BaseCommand):
                 36.1677, 8.7048,
                 date(2023, 1, 10), date(2026, 1, 9), date(2030, 1, 9),
                 "SOTETEL-KEF-2023",
-                "OLT Branch El Kef — zone rurale, 8 ports GPON, ~160 abonnés. Lien WAN via MPLS.",
+                "OLT Branch El Kef, rural area, 8 GPON ports, ~160 subscribers. WAN link via MPLS.",
             ),
             (
                 "OLT-NABEUL-01",
@@ -313,7 +313,7 @@ class Command(BaseCommand):
                 36.4563, 10.7356,
                 date(2022, 9, 20), date(2025, 9, 19), date(2029, 9, 19),
                 "SOTETEL-NAB-2022",
-                "OLT Branch Nabeul-Hammamet — zone côtière, 8 ports GPON, ~280 abonnés mixte résidentiel/hôtellerie.",
+                "OLT Branch Nabeul-Hammamet, coastal area, 8 GPON ports, ~280 mixed residential/hospitality subscribers.",
             ),
         ]
         for (hostname, ip, mgmt_ip, vendor, model, status, site_code, max_pon, max_ont,
@@ -419,7 +419,7 @@ class Command(BaseCommand):
                     "admin_status": True, "oper_status": True,
                     "speed_mbps": cfg["uplink_mbps"],
                     "mac_address": f"{pfx}:E0:00:01",
-                    "description": "Uplink principal — vers ISP-WAN / routeur de branche",
+                    "description": "Primary uplink to ISP-WAN / branch router",
                     "mtu": 9000,
                 },
             )
@@ -431,7 +431,7 @@ class Command(BaseCommand):
                     "oper_status": olt.hostname != "OLT-ELKEF-01",
                     "speed_mbps": cfg["uplink_mbps"],
                     "mac_address": f"{pfx}:E0:00:02",
-                    "description": "Uplink secondaire — redondance active/standby",
+                    "description": "Secondary uplink, active/standby redundancy",
                     "mtu": 9000,
                 },
             )
@@ -986,23 +986,23 @@ exit
         # ── OIDs ────────────────────────────────────────────────────────────
         oids_data = [
             # OLT-level
-            ("cpu_usage",           "1.3.6.1.4.1.2011.6.3.4.1.2.1",  "CPU OLT (%)",                 "%",   "gauge"),
-            ("memory_usage",        "1.3.6.1.4.1.2011.6.3.4.1.3.1",  "Mémoire OLT (%)",             "%",   "gauge"),
-            ("temperature",         "1.3.6.1.4.1.2011.6.3.4.1.4.1",  "Température CPU (°C)",        "°C",  "gauge"),
-            ("uptime",              "1.3.6.1.2.1.1.3.0",              "Uptime système (ticks)",      "s",   "timeticks"),
+            ("cpu_usage",           "1.3.6.1.4.1.2011.6.3.4.1.2.1",  "CPU Usage (%)",               "%",   "gauge"),
+            ("memory_usage",        "1.3.6.1.4.1.2011.6.3.4.1.3.1",  "Memory Usage (%)",            "%",   "gauge"),
+            ("temperature",         "1.3.6.1.4.1.2011.6.3.4.1.4.1",  "CPU Temperature (C)",         "C",   "gauge"),
+            ("uptime",              "1.3.6.1.2.1.1.3.0",              "System Uptime (ticks)",       "s",   "timeticks"),
             # GPON port-level
-            ("ont_online_count",    "1.3.6.1.4.1.2011.6.8.1.1.1.1",  "ONTs en ligne (par port)",    "",    "gauge"),
-            ("ont_total_count",     "1.3.6.1.4.1.2011.6.8.1.1.1.2",  "ONTs total (par port)",       "",    "gauge"),
-            ("ont_los_count",       "1.3.6.1.4.1.2011.6.8.1.1.1.5",  "ONTs en LOS (par port)",      "",    "gauge"),
-            ("rx_power_avg",        "1.3.6.1.4.1.2011.6.8.1.1.1.9",  "Puissance RX moy. (dBm)",     "dBm", "gauge"),
-            ("optical_tx_power",    "1.3.6.1.4.1.2011.6.8.1.1.1.8",  "Puissance TX émise (dBm)",    "dBm", "gauge"),
-            ("gpon_downstream_bw",  "1.3.6.1.4.1.2011.6.8.1.1.1.10", "Débit DS GPON (kbps)",        "kbps","gauge"),
-            ("gpon_upstream_bw",    "1.3.6.1.4.1.2011.6.8.1.1.1.11", "Débit US GPON (kbps)",        "kbps","gauge"),
+            ("ont_online_count",    "1.3.6.1.4.1.2011.6.8.1.1.1.1",  "Ports Online (per port)",     "",    "gauge"),
+            ("ont_total_count",     "1.3.6.1.4.1.2011.6.8.1.1.1.2",  "Ports Total (per port)",      "",    "gauge"),
+            ("ont_los_count",       "1.3.6.1.4.1.2011.6.8.1.1.1.5",  "LOS Count (per port)",        "",    "gauge"),
+            ("rx_power_avg",        "1.3.6.1.4.1.2011.6.8.1.1.1.9",  "Avg RX Power (dBm)",          "dBm", "gauge"),
+            ("optical_tx_power",    "1.3.6.1.4.1.2011.6.8.1.1.1.8",  "TX Power (dBm)",              "dBm", "gauge"),
+            ("gpon_downstream_bw",  "1.3.6.1.4.1.2011.6.8.1.1.1.10", "GPON Downstream BW (kbps)",   "kbps","gauge"),
+            ("gpon_upstream_bw",    "1.3.6.1.4.1.2011.6.8.1.1.1.11", "GPON Upstream BW (kbps)",     "kbps","gauge"),
             # Interface-level (uplink)
-            ("if_in_octets",        "1.3.6.1.2.1.2.2.1.10",          "Octets reçus (uplink)",       "B",   "counter"),
-            ("if_out_octets",       "1.3.6.1.2.1.2.2.1.16",          "Octets émis (uplink)",        "B",   "counter"),
-            ("if_in_errors",        "1.3.6.1.2.1.2.2.1.14",          "Erreurs RX (uplink)",         "",    "counter"),
-            ("if_out_errors",       "1.3.6.1.2.1.2.2.1.20",          "Erreurs TX (uplink)",         "",    "counter"),
+            ("if_in_octets",        "1.3.6.1.2.1.2.2.1.10",          "Bytes In (uplink)",           "B",   "counter"),
+            ("if_out_octets",       "1.3.6.1.2.1.2.2.1.16",          "Bytes Out (uplink)",          "B",   "counter"),
+            ("if_in_errors",        "1.3.6.1.2.1.2.2.1.14",          "RX Errors (uplink)",          "",    "counter"),
+            ("if_out_errors",       "1.3.6.1.2.1.2.2.1.20",          "TX Errors (uplink)",          "",    "counter"),
         ]
         oids = {}
         for name, oid, desc, unit, dtype in oids_data:
@@ -1019,7 +1019,7 @@ exit
             defaults={
                 "timeout_seconds": 3.0, "retries": 2,
                 "bulk_max_repetitions": 10, "is_default": True,
-                "description": "Profil polling standard OLTs SOTETEL",
+                "description": "Standard polling profile for SOTETEL OLTs",
             },
         )
         hw = Vendor.objects.get(code="HW")
@@ -1035,15 +1035,15 @@ exit
 
         # ── Threshold rules ─────────────────────────────────────────────────
         threshold_data = [
-            ("CPU Critique",          "cpu_usage",       ">",  85, "critical", "CPU OLT > 85%"),
-            ("CPU Avertissement",     "cpu_usage",       ">",  70, "warning",  "CPU OLT > 70%"),
-            ("Mémoire Critique",      "memory_usage",    ">",  90, "critical", "Mémoire OLT > 90%"),
-            ("Mémoire Avertissement", "memory_usage",    ">",  75, "warning",  "Mémoire OLT > 75%"),
-            ("Temp. Critique",        "temperature",     ">",  75, "critical", "Température > 75°C"),
-            ("Temp. Avertissement",   "temperature",     ">",  60, "warning",  "Température > 60°C"),
-            ("RX Power Faible",       "rx_power_avg",    "<", -27, "critical", "RX < -27 dBm — LOS imminent"),
-            ("LOS Détecté",           "ont_los_count",   ">",   5, "warning",  "> 5 ONTs en LOS sur ce port"),
-            ("ONT Online Faible",     "ont_online_count","<",  10, "warning",  "< 10 ONTs en ligne sur ce port"),
+            ("CPU Critical",          "cpu_usage",       ">",  85, "critical", "CPU OLT > 85%"),
+            ("CPU Warning",           "cpu_usage",       ">",  70, "warning",  "CPU OLT > 70%"),
+            ("Memory Critical",       "memory_usage",    ">",  90, "critical", "Memory OLT > 90%"),
+            ("Memory Warning",        "memory_usage",    ">",  75, "warning",  "Memory OLT > 75%"),
+            ("Temp. Critical",        "temperature",     ">",  75, "critical", "Temperature > 75C"),
+            ("Temp. Warning",         "temperature",     ">",  60, "warning",  "Temperature > 60C"),
+            ("RX Power Low",          "rx_power_avg",    "<", -27, "critical", "RX < -27 dBm, LOS imminent"),
+            ("LOS Detected",          "ont_los_count",   ">",   5, "warning",  "More than 5 LOS on this port"),
+            ("Low Online Count",      "ont_online_count","<",  10, "warning",  "Less than 10 ports online on this port"),
         ]
         rules = {}
         for name, oid_name, op, thr, sev, msg in threshold_data:
@@ -1176,28 +1176,28 @@ exit
         olt_sfax = OLT.objects.get(hostname="OLT-SFAX-01")
         olt_kef  = OLT.objects.get(hostname="OLT-ELKEF-01")
         SnmpAlert.objects.create(
-            rule=rules["RX Power Faible"], olt=olt_kef,
+            rule=rules["RX Power Low"], olt=olt_kef,
             value=-28.1,
-            message="RX -28.1 dBm port 0/1/6 El Kef — LOS corrigé après remplacement connecteur",
+            message="RX -28.1 dBm port 0/1/6 El Kef, LOS fixed after connector replacement",
             severity="critical", status="acknowledged",
         )
         SnmpAlert.objects.create(
-            rule=rules["LOS Détecté"], olt=olt_kef,
+            rule=rules["LOS Detected"], olt=olt_kef,
             value=47,
-            message="47 ONTs en LOS port 0/1/6 El Kef — coupure secteur rue Ibn Khaldoun",
+            message="47 LOS on port 0/1/6 El Kef, power outage Ibn Khaldoun street",
             severity="warning", status="resolved",
         )
         SnmpAlert.objects.create(
-            rule=rules["CPU Avertissement"], olt=olt_sfax,
+            rule=rules["CPU Warning"], olt=olt_sfax,
             value=72.4,
-            message="CPU 72.4% OLT-SFAX-01 — pic soirée, résolu automatiquement",
+            message="CPU 72.4% OLT-SFAX-01, evening peak, resolved automatically",
             severity="warning", status="resolved",
         )
         SnmpAlert.objects.create(
-            rule=rules["Temp. Avertissement"],
+            rule=rules["Temp. Warning"],
             olt=OLT.objects.get(hostname="OLT-NABEUL-01"),
             value=62.3,
-            message="Température 62.3°C OLT-NABEUL-01 — vérifier climatisation baie",
+            message="Temperature 62.3C OLT-NABEUL-01, check rack cooling system",
             severity="warning", status="active",
         )
 
@@ -1235,10 +1235,10 @@ exit
         )
 
         for name, metric, op, thr, sev, msg, cd in [
-            ("BFD Taux Perte Critique", "loss_rate",  ">", 3.0, "critical", "Taux perte BFD > 3%",        5),
-            ("BFD Session DOWN",        "state_down", "=", 0,   "critical", "Session BFD DOWN",            1),
-            ("BFD Flapping",            "flap_rate",  ">", 5,   "warning",  "Session BFD instable",       10),
-            ("BFD Detect Time Élevé",   "detect_time",">", 400, "warning",  "Temps détection BFD > 400ms",  5),
+            ("BFD High Loss Rate",  "loss_rate",  ">", 3.0, "critical", "BFD loss rate > 3%",         5),
+            ("BFD Session DOWN",    "state_down", "=", 0,   "critical", "BFD session DOWN",            1),
+            ("BFD Flapping",        "flap_rate",  ">", 5,   "warning",  "BFD session unstable",       10),
+            ("BFD High Detect Time","detect_time",">", 400, "warning",  "BFD detection time > 400ms",  5),
         ]:
             BFDThresholdRule.objects.get_or_create(
                 name=name,
@@ -1374,11 +1374,6 @@ exit
              ["cpu_usage","memory_usage","temperature","rx_power_avg","ont_online_count","ont_los_count"]),
             ("Prophet CPU Forecast v1.3", "prophet",          "1.3", "active",  0.957, True,
              ["cpu_usage"]),
-            ("LSTM ONT Counter v1.0",     "lstm",             "1.0", "active",  0.891, True,
-             ["ont_online_count","rx_power_avg","ont_los_count"]),
-            ("Prophet Traffic v1.0",      "prophet",          "1.0", "active",  0.931, False,
-             ["if_in_octets","if_out_octets","gpon_downstream_bw"]),
-            ("Grok Explainer v3.0",       "grok",             "3.0", "pending", None,  False, []),
         ]:
             ml, created = MLModel.objects.get_or_create(
                 name=name,
@@ -1387,7 +1382,7 @@ exit
                     "accuracy_score": acc, "is_active": active, "features": features,
                     "last_trained_at":now - timedelta(days=random.randint(3, 15)) if acc else None,
                     "trained_by":     admin,
-                    "description":    f"Modèle {mtype} pour supervision FTTH SOTETEL",
+                    "description":    f"{mtype} model for SOTETEL FTTH supervision",
                     "parameters":     {"n_estimators": 150, "contamination": 0.04}
                                       if mtype == "isolation_forest" else {},
                 },
@@ -1416,23 +1411,23 @@ exit
         anomalies = [
             # olt,             metric,           actual,  expected, score, sev,       resolved, h
             ("OLT-ELKEF-01",  "rx_power_avg",    -28.1,  -21.0,   0.94, "critical", True,   18,
-             "Puissance optique RX chutée à -28.1 dBm port 0/1/6 El Kef — micro-rupture fibre ou défaut connecteur SC/APC."),
-            ("OLT-ELKEF-01",  "ont_online_count",  92,   155.0,   0.92, "critical", True,   17,
-             "63 ONTs hors ligne OLT El Kef — coupure alimentation secteur rue Ibn Khaldoun. 47 en LOS."),
-            ("OLT-ELKEF-01",  "ont_los_count",     47,     1.0,   0.90, "critical", True,   17,
-             "47 ONTs en LOS simultanément — corrélé à la coupure alimentation. Rétabli après 1h."),
-            ("OLT-SFAX-01",   "cpu_usage",         78.4,  48.0,   0.82, "high",     True,   36,
-             "Pic CPU 78.4% OLT Sfax 45 min — tempête ARP ou rafale re-enregistrement ONTs."),
-            ("OLT-SFAX-01",   "memory_usage",      82.1,  62.0,   0.77, "high",     True,   35,
-             "Mémoire 82% corrélée au pic CPU — processus SNMP en surcharge."),
-            ("OLT-NABEUL-01", "temperature",       62.3,  47.0,   0.73, "high",     False,   5,
-             "Température CPU 62.3°C Nabeul — vérifier ventilation baie réseau (chaleur estivale)."),
-            ("OLT-SFAX-01",   "rx_power_avg",     -24.8, -17.5,   0.69, "medium",   False,   2,
-             "Dégradation optique port 0/1/9 Sfax — atténuation accrue, surveiller évolution."),
+             "Optical RX power dropped to -28.1 dBm on port 0/1/6 El Kef, possible fiber break or SC/APC connector fault."),
+            ("OLT-ELKEF-01",  "cpu_usage",        81.2,   48.0,   0.92, "critical", True,   17,
+             "CPU spike 81.2% on OLT El Kef, ARP storm or mass re-registration burst detected."),
+            ("OLT-ELKEF-01",  "memory_usage",     88.5,   62.0,   0.90, "critical", True,   17,
+             "Memory 88.5% on OLT El Kef, correlated with CPU spike. Resolved after 1h."),
+            ("OLT-SFAX-01",   "cpu_usage",        78.4,   48.0,   0.82, "high",     True,   36,
+             "CPU peak 78.4% on OLT Sfax for 45 min, ARP storm or registration burst."),
+            ("OLT-SFAX-01",   "memory_usage",     82.1,   62.0,   0.77, "high",     True,   35,
+             "Memory 82% correlated with CPU peak, SNMP process overload."),
+            ("OLT-NABEUL-01", "temperature",      62.3,   47.0,   0.73, "high",     False,   5,
+             "CPU temperature 62.3C on Nabeul, check rack ventilation, summer heat conditions."),
+            ("OLT-SFAX-01",   "rx_power_avg",    -24.8,  -17.5,   0.69, "medium",   False,   2,
+             "Optical degradation on port 0/1/9 Sfax, increased attenuation, monitor for further drops."),
             ("OLT-SFAX-01",   "gpon_downstream_bw",1_950_000, 1_200_000, 0.67, "medium", True, 48,
-             "Pic trafic descendant 1.95 Gbps OLT Sfax — pic soirée exceptionnel (événement sportif)."),
-            ("OLT-HQ-01",     "cpu_usage",         28.5,  12.0,   0.62, "low",      True,   72,
-             "Légère hausse CPU HQ lors collecte SNMP batch — comportement normal."),
+             "Downstream traffic peak 1.95 Gbps on OLT Sfax, exceptional evening spike."),
+            ("OLT-HQ-01",     "cpu_usage",        28.5,   12.0,   0.62, "low",      True,   72,
+             "Minor CPU increase on HQ during SNMP batch collection, normal behavior."),
         ]
 
         for olt_name, metric, actual, expected, score, sev, resolved, h_ago, expl in anomalies:
@@ -1459,18 +1454,18 @@ exit
 
         alerts_data = [
             # olt,              sev,        status,         msg,                                                       val,    h
-            ("OLT-ELKEF-01",  "critical", "resolved",     "RX -28.1 dBm port 0/1/6 — LOS corrigé El Kef",           -28.1,  18),
-            ("OLT-ELKEF-01",  "critical", "resolved",     "92 ONTs hors ligne — panne secteur rue Ibn Khaldoun",      None,   17),
-            ("OLT-ELKEF-01",  "critical", "resolved",     "47 ONTs en LOS simultané — coupure alimentation",          47.0,   17),
-            ("OLT-SFAX-01",   "major",    "acknowledged", "CPU 78.4% pendant 45 min — pic trafic soirée",             78.4,   36),
-            ("OLT-SFAX-01",   "warning",  "resolved",     "Mémoire 82% corrélée au pic CPU [OLT-SFAX-01]",           82.1,   35),
-            ("OLT-NABEUL-01", "major",    "active",       "Température 62.3°C — vérifier climatisation Nabeul",       62.3,    5),
-            ("OLT-SFAX-01",   "warning",  "active",       "Dégradation optique port 0/1/9 — RX -24.8 dBm",          -24.8,   2),
-            ("OLT-ELKEF-01",  "critical", "resolved",     "BFD-HQ-ELKEF DOWN 1h — lien rétabli (panne secteur)",      None,   17),
-            ("OLT-HQ-01",     "info",     "resolved",     "Firmware V800R021C10SPC400 disponible [OLT-HQ-01]",        None,   48),
-            ("OLT-SFAX-01",   "info",     "resolved",     "Rapport journalier — 441/450 ONTs en ligne (98%)",         None,   24),
-            ("OLT-NABEUL-01", "info",     "resolved",     "Nouveau ONT STEL00000281 enregistré port 0/1/8",           None,   12),
-            ("OLT-SFAX-01",   "major",    "resolved",     "Pic trafic 1.95 Gbps — dépassement capacité nominale",     None,   48),
+            ("OLT-ELKEF-01",  "critical", "resolved",     "RX -28.1 dBm port 0/1/6, LOS fixed El Kef",              -28.1,  18),
+            ("OLT-ELKEF-01",  "critical", "resolved",     "92 ports offline, power outage Ibn Khaldoun street",       None,   17),
+            ("OLT-ELKEF-01",  "critical", "resolved",     "47 simultaneous LOS on port 0/1/6, power failure",         47.0,   17),
+            ("OLT-SFAX-01",   "major",    "acknowledged", "CPU 78.4% for 45 min, evening traffic peak",               78.4,   36),
+            ("OLT-SFAX-01",   "warning",  "resolved",     "Memory 82% correlated with CPU peak [OLT-SFAX-01]",       82.1,   35),
+            ("OLT-NABEUL-01", "major",    "active",       "Temperature 62.3C, check cooling system Nabeul",           62.3,    5),
+            ("OLT-SFAX-01",   "warning",  "active",       "Optical degradation port 0/1/9, RX -24.8 dBm",           -24.8,   2),
+            ("OLT-ELKEF-01",  "critical", "resolved",     "BFD-HQ-ELKEF DOWN 1h, link restored after sector outage",  None,   17),
+            ("OLT-HQ-01",     "info",     "resolved",     "Firmware V800R021C10SPC400 available [OLT-HQ-01]",         None,   48),
+            ("OLT-SFAX-01",   "info",     "resolved",     "Daily report, 441/450 ports online (98%)",                 None,   24),
+            ("OLT-NABEUL-01", "info",     "resolved",     "New subscriber STEL00000281 registered port 0/1/8",        None,   12),
+            ("OLT-SFAX-01",   "major",    "resolved",     "Traffic peak 1.95 Gbps, nominal capacity exceeded",        None,   48),
         ]
         for olt_name, sev, status, msg, val, h_ago in alerts_data:
             olt = OLT.objects.filter(hostname=olt_name).first()
@@ -1696,13 +1691,13 @@ exit
         admin = User.objects.filter(is_superuser=True).first()
 
         report_specs = [
-            ("Rapport quotidien SOTETEL — 16 mai 2026",        "daily",   "pdf",  now - timedelta(days=1),  now),
-            ("Rapport hebdomadaire — Semaine 20 (2026)",        "weekly",  "pdf",  now - timedelta(days=7),  now),
-            ("Rapport mensuel — Avril 2026",                    "monthly", "xlsx", now - timedelta(days=30), now - timedelta(days=1)),
-            ("Analyse incident El Kef — panne secteur 16/05",   "custom",  "pdf",  now - timedelta(days=1),  now),
-            ("KPI Sfax — Pic trafic soirée (7 derniers jours)", "custom",  "xlsx", now - timedelta(days=7),  now),
-            ("Disponibilité OLTs — Q1 2026",                    "custom",  "pdf",  now - timedelta(days=90), now - timedelta(days=60)),
-            ("Rapport BFD — Analyse sessions backbone mai 2026","custom",  "pdf",  now - timedelta(days=30), now),
+            ("SOTETEL Daily Report, 16 May 2026",               "daily",   "pdf",  now - timedelta(days=1),  now),
+            ("Weekly Report, Week 20 (2026)",                   "weekly",  "pdf",  now - timedelta(days=7),  now),
+            ("Monthly Report, April 2026",                      "monthly", "xlsx", now - timedelta(days=30), now - timedelta(days=1)),
+            ("El Kef Incident Analysis, Outage 16/05",          "custom",  "pdf",  now - timedelta(days=1),  now),
+            ("Sfax KPI, Evening Traffic Peak (Last 7 Days)",    "custom",  "xlsx", now - timedelta(days=7),  now),
+            ("OLT Availability, Q1 2026",                       "custom",  "pdf",  now - timedelta(days=90), now - timedelta(days=60)),
+            ("BFD Report, Backbone Sessions Analysis May 2026", "custom",  "pdf",  now - timedelta(days=30), now),
         ]
 
         generated = 0

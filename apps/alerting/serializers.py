@@ -10,7 +10,6 @@ class AlertRuleSerializer(serializers.ModelSerializer):
 class AlertSerializer(serializers.ModelSerializer):
     rule_name = serializers.CharField(source='rule.name', read_only=True)
     olt_hostname = serializers.CharField(source='olt.hostname', read_only=True, allow_null=True)
-    ont_serial = serializers.CharField(source='ont.serial_number', read_only=True, allow_null=True)
     severity_display = serializers.CharField(source='get_severity_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     acknowledged_by_email = serializers.CharField(source='acknowledged_by.email', read_only=True, allow_null=True)

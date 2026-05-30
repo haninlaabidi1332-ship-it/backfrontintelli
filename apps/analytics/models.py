@@ -45,10 +45,10 @@ class KPIHistory(BaseModel):
 class Report(BaseModel):
     """Rapport généré (PDF, Excel)."""
     class ReportType(models.TextChoices):
-        DAILY = 'daily', 'Rapport quotidien'
-        WEEKLY = 'weekly', 'Rapport hebdomadaire'
-        MONTHLY = 'monthly', 'Rapport mensuel'
-        CUSTOM = 'custom', 'Personnalisé'
+        DAILY = 'daily', 'Daily'
+        WEEKLY = 'weekly', 'Weekly'
+        MONTHLY = 'monthly', 'Monthly'
+        CUSTOM = 'custom', 'Custom'
 
     class Status(models.TextChoices):
         PENDING = 'pending', 'En attente'

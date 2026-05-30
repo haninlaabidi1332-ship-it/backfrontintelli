@@ -102,16 +102,60 @@ def evaluate_rules_for_olt(olt_id):
     from apps.bfd_monitor.models import BFDActiveAlert
     from apps.ai_engine.models import AnomalyDetection
     from .models import AlertRule, Alert
+    from django.conf import settings
     from django.utils import timezone
     from datetime import timedelta
+
+    # ── Simulation mode: fire/resolve alerts based on recent SNMP metrics ─────
+    if getattr(settings, 'SIMULATION_MODE', False):
+        from apps.equipements.models import OLT
+        from apps.snmp_collector.models import MetricHistory
+        try:
+            olt = OLT.objects.get(id=olt_id)
+        except OLT.DoesNotExist:
+            return
+
+        since = timezone.now() - timedelta(minutes=10)
+
+        thresholds = [
+            ('cpu_usage',    80.0, 'critical', 'CPU {value:.1f}% on {olt}, threshold exceeded'),
+            ('memory_usage', 84.0, 'warning',  'Memory {value:.1f}% on {olt}, high usage'),
+            ('temperature',  62.0, 'major',    'Temperature {value:.1f}C on {olt}, check cooling'),
+        ]
+
+        for oid_frag, threshold, severity, template in thresholds:
+            latest = MetricHistory.objects.filter(
+                olt=olt, oid__name__icontains=oid_frag,
+                timestamp__gte=since, numeric_value__isnull=False
+            ).order_by('-timestamp').first()
+
+            active_alert = Alert.objects.filter(
+                olt=olt, status='active', message__icontains=oid_frag.replace('_', ' ')
+            ).first()
+
+            if latest and latest.numeric_value > threshold:
+                if not active_alert:
+                    Alert.objects.create(
+                        olt=olt,
+                        severity=severity,
+                        status='active',
+                        message=template.format(value=latest.numeric_value, olt=olt.hostname),
+                        value=latest.numeric_value,
+                    )
+                    logger.info("[SIM] Alert fired: %s=%.1f on %s", oid_frag, latest.numeric_value, olt.hostname)
+            elif active_alert:
+                active_alert.status = 'resolved'
+                active_alert.cleared_at = timezone.now()
+                active_alert.save(update_fields=['status', 'cleared_at'])
+                logger.info("[SIM] Alert resolved: %s on %s", oid_frag, olt.hostname)
+        return
 
     rules = AlertRule.objects.filter(is_active=True)
     for rule in rules:
         if rule.source_type == 'snmp' and rule.snmp_rule:
-            # Récupérer les alertes SNMP actives non encore converties
             snmp_alerts = SnmpAlert.objects.filter(
                 rule=rule.snmp_rule, olt_id=olt_id, status='active'
-            ).exclude(alert__isnull=False)
+            )
             for sa in snmp_alerts:
                 # Déduplication
                 exists = Alert.objects.filter(
@@ -135,7 +179,7 @@ def evaluate_rules_for_olt(olt_id):
         elif rule.source_type == 'bfd' and rule.bfd_rule:
             bfd_alerts = BFDActiveAlert.objects.filter(
                 rule=rule.bfd_rule, session__olt_id=olt_id, status='active'
-            ).exclude(alert__isnull=False)
+            )
             for ba in bfd_alerts:
                 exists = Alert.objects.filter(
                     rule=rule, olt_id=olt_id, source_id=str(ba.id)
@@ -159,7 +203,7 @@ def evaluate_rules_for_olt(olt_id):
                 olt_id=olt_id,
                 resolved=False,
                 severity__gte=rule.ai_severity_min
-            ).exclude(alert__isnull=False)
+            )
             for anom in anomalies:
                 exists = Alert.objects.filter(
                     rule=rule, olt_id=olt_id, source_id=str(anom.id)
@@ -178,3 +222,46 @@ def evaluate_rules_for_olt(olt_id):
                 )
                 for channel in NotificationChannel.objects.filter(is_active=True):
                     send_alert_notification.delay(channel.id, alert.id, None)
+
+    # Auto-resolve active alerts whose underlying source is no longer active
+    _auto_resolve_stale_alerts(olt_id)
+
+
+def _auto_resolve_stale_alerts(olt_id):
+    """Resolve alerts whose source (SNMP/BFD/AI) is no longer active."""
+    from apps.snmp_collector.models import SnmpAlert
+    from apps.bfd_monitor.models import BFDActiveAlert
+    from apps.ai_engine.models import AnomalyDetection
+    from .models import Alert
+    from django.utils import timezone
+
+    active_alerts = Alert.objects.filter(olt_id=olt_id, status='active').select_related('rule')
+    for alert in active_alerts:
+        if not alert.rule or not alert.source_id:
+            continue
+        rule = alert.rule
+        still_active = True
+        try:
+            if rule.source_type == 'snmp':
+                still_active = SnmpAlert.objects.filter(id=alert.source_id, status='active').exists()
+            elif rule.source_type == 'bfd':
+                still_active = BFDActiveAlert.objects.filter(id=alert.source_id, status='active').exists()
+            elif rule.source_type == 'ai':
+                still_active = AnomalyDetection.objects.filter(id=alert.source_id, resolved=False).exists()
+        except Exception:
+            continue
+        if not still_active:
+            alert.status = 'resolved'
+            alert.cleared_at = timezone.now()
+            alert.save(update_fields=['status', 'cleared_at'])
+
+
+@shared_task(name='alerting.evaluate_all_rules')
+def evaluate_all_rules():
+    """Evaluate alert rules for every active OLT."""
+    from apps.equipements.models import OLT
+    olt_ids = list(OLT.objects.filter(status__in=['active', 'degraded']).values_list('id', flat=True))
+    for olt_id in olt_ids:
+        evaluate_rules_for_olt.delay(olt_id)
+    logger.info("evaluate_all_rules: %d OLTs scheduled", len(olt_ids))
+    return {"scheduled": len(olt_ids)}

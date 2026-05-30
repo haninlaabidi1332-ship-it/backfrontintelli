@@ -16,6 +16,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-42$a^d$1rh(zc%&7t7nk((1499w3+6n8008-3bjqc5c+j*!ic!")
 DEBUG = env("DEBUG", default=False)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+SIMULATION_MODE = env.bool("SIMULATION_MODE", default=False)
 
 # Application definition
 DJANGO_APPS = [
@@ -59,9 +60,9 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -200,6 +201,10 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
 ])
 CORS_ALLOW_CREDENTIALS = True
 
@@ -240,36 +245,51 @@ CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # Tâches planifiées (à adapter selon vos apps)
 CELERY_BEAT_SCHEDULE = {
+    # SNMP polling — every 60 s
     'collect-snmp-every-60s': {
-        'task': 'apps.snmp_collector.tasks.collect_all_metrics',
+        'task': 'snmp.collect_all_olts',
         'schedule': 60.0,
     },
+    # BFD polling — every 30 s
     'check-bfd-every-30s': {
-        'task': 'apps.bfd_monitor.tasks.check_bfd_sessions',
+        'task': 'bfd.poll_all_sessions',
         'schedule': 30.0,
     },
+    # AI anomaly detection — every 5 min
     'run-anomaly-detection-every-5m': {
-        'task': 'apps.ai_engine.tasks.run_anomaly_detection',
+        'task': 'ai.detect_all_anomalies',
         'schedule': 300.0,
     },
+    # Alert rule evaluation — every 60 s
     'evaluate-alert-rules-every-minute': {
-        'task': 'apps.alerting.tasks.evaluate_rules_for_olt',
+        'task': 'alerting.evaluate_all_rules',
         'schedule': 60.0,
     },
+    # KPI aggregation
     'aggregate-kpi-hourly': {
         'task': 'analytics.aggregate_kpi',
-        'schedule': 3600.0,  # toutes les heures
-        'kwargs': {'period': 'hour'}
+        'schedule': 3600.0,
+        'kwargs': {'period': 'hour'},
     },
     'aggregate-kpi-daily': {
         'task': 'analytics.aggregate_kpi',
-        'schedule': crontab(hour=1, minute=0),  # chaque jour à 01:00
-        'kwargs': {'period': 'day'}
+        'schedule': crontab(hour=1, minute=0),
+        'kwargs': {'period': 'day'},
     },
-    'evaluate-alert-rules': {
-        'task': 'alerting.evaluate_rules_for_olt',
-        'schedule': 60.0,
-        'kwargs': {'olt_id': None}  # à adapter pour itérer sur tous les OLT
+    # Network traffic collection — every 5 min
+    'collect-network-traffic-every-5m': {
+        'task': 'analytics.collect_all_network_traffic',
+        'schedule': 300.0,
+    },
+    # Analytics anomaly flagging — every 10 min
+    'detect-analytics-anomalies-every-10m': {
+        'task': 'analytics.detect_anomalies',
+        'schedule': 600.0,
+    },
+    # Purge MetricHistory older than 90 days — daily at 02:00
+    'purge-old-metrics-daily': {
+        'task': 'snmp.purge_old_metrics',
+        'schedule': crontab(hour=2, minute=0),
     },
 }
 
@@ -331,7 +351,11 @@ SITE_DESCRIPTION = "Plateforme intelligente de supervision d'équipements OLT"
 CONTACT_EMAIL = env("CONTACT_EMAIL", default="contact@intelliolt.tn")
 SUPPORT_EMAIL = env("SUPPORT_EMAIL", default="support@intelliolt.tn")
 
-# AI / Grok (optionnel)
+# AI / Ollama (local LLM — primary, offline)
+OLLAMA_HOST = env("OLLAMA_HOST", default="http://localhost:11434")
+OLLAMA_MODEL = env("OLLAMA_MODEL", default="llama3.2:3b")
+
+# AI / Grok (xAI cloud — fallback, optional)
 GROK_API_KEY = env("GROK_API_KEY", default="")
 GROK_API_ENDPOINT = env("GROK_API_ENDPOINT", default="https://api.x.ai/v1/chat/completions")
 GROK_MODEL = env("GROK_MODEL", default="grok-4.20-reasoning")

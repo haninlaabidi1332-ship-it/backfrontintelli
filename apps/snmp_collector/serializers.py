@@ -43,13 +43,12 @@ class MetricHistorySerializer(serializers.ModelSerializer):
     oid_name = serializers.CharField(source='oid.name', read_only=True)
     oid_unit = serializers.CharField(source='oid.unit', read_only=True)
     interface_name = serializers.CharField(source='interface.name', read_only=True, allow_null=True)
-    ont_serial = serializers.CharField(source='ont.serial_number', read_only=True, allow_null=True)
 
     class Meta:
         model = MetricHistory
         fields = [
             'id', 'olt', 'olt_hostname', 'oid', 'oid_name', 'oid_unit',
-            'interface', 'interface_name', 'ont', 'ont_serial',
+            'interface', 'interface_name',
             'raw_value', 'numeric_value', 'timestamp'
         ]
         read_only_fields = ['id', 'timestamp']

@@ -41,8 +41,96 @@ def _build_community_data(olt):
     return CommunityData(olt.snmp_community, mpModel=mp_model)
 
 
+def _simulated_snmp_value(olt_id: str, oid_name: str) -> tuple:
+    """
+    Returns a realistic simulated SNMP value based on OID name and time of day.
+    Values follow business-hour load patterns with occasional spikes.
+    """
+    import random
+    import hashlib
+    from django.utils import timezone
+
+    now = timezone.now()
+    hour = now.hour
+    minute = now.minute
+    # Deterministic per-OLT seed so different OLTs have different baselines
+    olt_seed = int(hashlib.md5(str(olt_id).encode()).hexdigest()[:8], 16) % 100
+
+    # Business-hour load factor: peaks 08-18, low at night
+    if 8 <= hour <= 18:
+        load = 0.6 + 0.3 * abs(hour - 13) / 5  # peaks at 08 and 18, dip at 13
+    else:
+        load = 0.15 + 0.1 * random.random()
+
+    # Occasional spike (1% of polls)
+    spike = random.random() < 0.01
+
+    oid_lower = oid_name.lower()
+
+    if 'cpu' in oid_lower:
+        base = 25 + olt_seed * 0.3
+        value = base + load * 40 + (random.uniform(30, 50) if spike else random.uniform(-5, 5))
+        value = max(5.0, min(95.0, value))
+
+    elif 'mem' in oid_lower or 'memory' in oid_lower:
+        base = 50 + olt_seed * 0.2
+        value = base + load * 15 + random.uniform(-3, 3)
+        value = max(30.0, min(90.0, value))
+
+    elif 'temp' in oid_lower:
+        base = 38 + olt_seed * 0.1
+        value = base + load * 8 + random.uniform(-1, 1)
+        value = max(30.0, min(65.0, value))
+
+    elif 'rx' in oid_lower or 'optical' in oid_lower:
+        # Optical RX power in dBm — normal range -8 to -25 dBm
+        base = -14.0 - (olt_seed % 8)
+        value = base + random.uniform(-0.5, 0.5)
+        if spike:
+            value = base - random.uniform(8, 12)  # sudden power drop
+
+    elif 'tx' in oid_lower:
+        value = -3.0 + random.uniform(-0.3, 0.3)
+
+    elif 'in_octets' in oid_lower or 'ifinoctets' in oid_lower:
+        # Cumulative counter — simulate increment
+        base_rate = (1 + load) * (50 + olt_seed) * 1_000_000  # bytes/min
+        value = base_rate * minute + random.randint(0, 100000)
+
+    elif 'out_octets' in oid_lower or 'ifoutoctets' in oid_lower:
+        base_rate = (1 + load) * (30 + olt_seed) * 1_000_000
+        value = base_rate * minute + random.randint(0, 100000)
+
+    elif 'error' in oid_lower:
+        value = 0 if not spike else random.randint(5, 50)
+
+    elif 'uptime' in oid_lower:
+        # Uptime in hundredths of a second — simulate ~30 days
+        value = 30 * 24 * 3600 * 100 + random.randint(0, 10000)
+
+    else:
+        value = round(random.uniform(0, 100), 2)
+
+    value = round(value, 4)
+    return str(value), value, None
+
+
 def fetch_snmp_value(olt, oid_str: str, timeout: float = 2.0, retries: int = 2):
     """Retourne (raw_value, numeric_value, error)."""
+    from django.conf import settings
+    if getattr(settings, 'SIMULATION_MODE', False):
+        # Derive OID name from OID string for realistic value generation
+        oid_name = oid_str.split('.')[-1] if '.' in oid_str else oid_str
+        # Try to look up the friendly name from DB
+        try:
+            from .models import SnmpOID
+            oid_obj = SnmpOID.objects.filter(oid=oid_str).first()
+            if oid_obj:
+                oid_name = oid_obj.name
+        except Exception:
+            pass
+        return _simulated_snmp_value(str(olt.id), oid_name)
+
     (SnmpEngine, _, _, UdpTransportTarget, ContextData,
      ObjectType, ObjectIdentity, getCmd, *_) = _snmp_imports()
 
@@ -179,9 +267,12 @@ def evaluate_snmp_thresholds(olt_id: str):
     except OLT.DoesNotExist:
         return
 
-    # Récupérer la dernière métrique par OID
+    # Récupérer la dernière métrique par OID (limitée à la dernière heure pour les performances)
+    since = timezone.now() - timedelta(hours=1)
     latest_metrics = {}
-    for metric in MetricHistory.objects.filter(olt=olt, numeric_value__isnull=False).order_by('-timestamp'):
+    for metric in MetricHistory.objects.filter(
+        olt=olt, numeric_value__isnull=False, timestamp__gte=since
+    ).order_by('-timestamp'):
         if metric.oid_id not in latest_metrics:
             latest_metrics[metric.oid_id] = metric.numeric_value
 

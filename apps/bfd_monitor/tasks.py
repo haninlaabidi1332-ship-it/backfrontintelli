@@ -10,41 +10,74 @@ logger = logging.getLogger(__name__)
 # --- Helper de collecte (à remplacer par vraie collecte SNMP/CLI) ---
 def fetch_bfd_status(session):
     """
-    Simulateur de collecte BFD.
-    À remplacer par un vrai appel SNMP (pysnmp) ou CLI, en fonction de session.snmp_oid_state.
+    Realistic BFD simulation.
+    Real polling (SNMP BFD-STD-MIB) can replace this when devices are connected.
     """
     import random
+    import hashlib
+    from django.conf import settings
+    from django.utils import timezone
+
     current_state = session.state
-    # Simulation simple
-    if current_state == 'up':
-        new_state = 'up' if random.random() < 0.95 else 'down'
-    else:
-        new_state = 'up' if random.random() < 0.3 else current_state
 
-    # Incréments
-    up_inc = 1 if new_state == 'up' and current_state != 'up' else 0
-    down_inc = 1 if new_state == 'down' and current_state != 'down' else 0
-    flap_inc = 1 if (new_state != current_state and (session.up_count + session.down_count) > 0) else 0
+    if getattr(settings, 'SIMULATION_MODE', False):
+        # Deterministic per-session seed so each session has independent behaviour
+        seed = int(hashlib.md5(str(session.id).encode()).hexdigest()[:8], 16)
+        rng = random.Random(seed + int(timezone.now().timestamp() / 30))
 
-    # Métriques simulées
-    packets_sent = session.packets_sent + random.randint(10, 100)
-    packets_received = session.packets_received + random.randint(0, 99)
-    loss_rate = max(0, (packets_sent - packets_received) / packets_sent * 100) if packets_sent else 0
+        if current_state == 'up':
+            # 97% of 30-second polls stay UP; occasional 30–90 s outage
+            new_state = 'up' if rng.random() < 0.97 else 'down'
+        elif current_state == 'down':
+            # Recovery: 60% chance per poll (comes back after ~1 poll on average)
+            new_state = 'up' if rng.random() < 0.60 else 'down'
+        else:
+            new_state = 'up' if rng.random() < 0.5 else current_state
 
+        # Packet metrics — realistic for a 300 ms BFD interval
+        tx_interval = max(session.desired_tx_interval_ms or 300, 100)
+        pkts_per_poll = max(1, int(30_000 / tx_interval))
+        packets_sent = session.packets_sent + pkts_per_poll
+        if new_state == 'up':
+            loss_pct = rng.uniform(0, 0.5)          # < 0.5 % normal loss
+        else:
+            loss_pct = rng.uniform(30, 100)          # high loss during outage
+        packets_lost = int(pkts_per_poll * loss_pct / 100)
+        packets_received = packets_sent - packets_lost - session.packets_sent
+
+        up_inc   = 1 if new_state == 'up'   and current_state != 'up'   else 0
+        down_inc = 1 if new_state == 'down' and current_state != 'down' else 0
+        flap_inc = 1 if new_state != current_state and (session.up_count + session.down_count) > 0 else 0
+
+        return {
+            'state': new_state,
+            'up_count_inc': up_inc,
+            'down_count_inc': down_inc,
+            'flap_count_inc': flap_inc,
+            'diagnostic': 0 if new_state == 'up' else 1,
+            'packets_sent': packets_sent,
+            'packets_received': max(0, packets_received),
+            'packets_lost': max(0, packets_lost),
+            'loss_rate_pct': round(loss_pct, 2),
+            'remote_state': 'up' if new_state == 'up' else 'down',
+            'actual_tx_interval_ms': tx_interval,
+            'actual_rx_interval_ms': session.required_rx_interval_ms or tx_interval,
+            'uptime_seconds': session.uptime_seconds + 30 if new_state == 'up' else 0,
+        }
+
+    # ── Real polling path (non-simulation) ──────────────────────────────────
+    # Replace with SNMP BFD-STD-MIB query when real devices are connected.
     return {
-        'state': new_state,
-        'up_count_inc': up_inc,
-        'down_count_inc': down_inc,
-        'flap_count_inc': flap_inc,
+        'state': current_state,
+        'up_count_inc': 0, 'down_count_inc': 0, 'flap_count_inc': 0,
         'diagnostic': 0,
-        'packets_sent': packets_sent,
-        'packets_received': packets_received,
-        'packets_lost': packets_sent - packets_received,
-        'loss_rate_pct': loss_rate,
-        'remote_state': 'up' if new_state == 'up' else 'down',
+        'packets_sent': session.packets_sent + 10,
+        'packets_received': session.packets_received + 10,
+        'packets_lost': 0, 'loss_rate_pct': 0.0,
+        'remote_state': current_state,
         'actual_tx_interval_ms': session.desired_tx_interval_ms,
         'actual_rx_interval_ms': session.required_rx_interval_ms,
-        'uptime_seconds': session.uptime_seconds + 1 if new_state == 'up' else 0,
+        'uptime_seconds': session.uptime_seconds + 30 if current_state == 'up' else 0,
     }
 
 

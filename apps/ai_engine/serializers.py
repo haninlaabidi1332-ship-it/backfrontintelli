@@ -14,7 +14,6 @@ class MLModelSerializer(serializers.ModelSerializer):
 
 class AnomalyDetectionSerializer(serializers.ModelSerializer):
     olt_hostname = serializers.CharField(source='olt.hostname', read_only=True, allow_null=True)
-    ont_serial = serializers.CharField(source='ont.serial_number', read_only=True, allow_null=True)
     interface_name = serializers.CharField(source='interface.name', read_only=True, allow_null=True)
     oid_name = serializers.CharField(source='oid.name', read_only=True, allow_null=True)
     severity_display = serializers.CharField(source='get_severity_display', read_only=True)
@@ -27,7 +26,6 @@ class AnomalyDetectionSerializer(serializers.ModelSerializer):
 
 class PredictionSerializer(serializers.ModelSerializer):
     olt_hostname = serializers.CharField(source='olt.hostname', read_only=True, allow_null=True)
-    ont_serial = serializers.CharField(source='ont.serial_number', read_only=True, allow_null=True)
 
     class Meta:
         model = Prediction

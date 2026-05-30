@@ -14,27 +14,42 @@ import os
 logger = logging.getLogger(__name__)
 
 
+# --- Helper Ollama (LLM local, offline) ---
+def call_ollama(prompt: str, system_prompt: str = None) -> str:
+    import requests
+    host = getattr(settings, 'OLLAMA_HOST', 'http://localhost:11434')
+    model = getattr(settings, 'OLLAMA_MODEL', 'llama3.2:3b')
+
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    try:
+        response = requests.post(
+            f"{host}/api/chat",
+            json={"model": model, "messages": messages, "stream": False},
+            timeout=120
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data.get('message', {}).get('content', '').strip()
+    except Exception as e:
+        logger.error("Erreur appel Ollama: %s", e)
+        return ""
+
+
 # --- Helper d'intégration Grok (xAI) ---
 def call_grok_api(prompt: str, system_prompt: str = None) -> str:
-    """
-    Appelle l'API Grok (xAI) pour obtenir une explication textuelle.
-    Nécessite les variables d'environnement GROK_API_KEY, GROK_API_ENDPOINT, GROK_MODEL.
-    """
     import requests
-    from django.conf import settings
-
     api_key = getattr(settings, 'GROK_API_KEY', '')
     endpoint = getattr(settings, 'GROK_API_ENDPOINT', 'https://api.x.ai/v1/chat/completions')
     model = getattr(settings, 'GROK_MODEL', 'grok-4.20-reasoning')
 
     if not api_key:
-        logger.warning("GROK_API_KEY non configurée, retour du prompt simple")
-        return f"Explication non disponible (clé API manquante). Données : {prompt}"
+        return ""
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -42,17 +57,24 @@ def call_grok_api(prompt: str, system_prompt: str = None) -> str:
 
     try:
         response = requests.post(endpoint, json={
-            "model": model,
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 500
+            "model": model, "messages": messages, "temperature": 0.7, "max_tokens": 500
         }, timeout=30)
         response.raise_for_status()
-        data = response.json()
-        return data['choices'][0]['message']['content']
+        return response.json()['choices'][0]['message']['content']
     except Exception as e:
         logger.error("Erreur appel Grok: %s", e)
-        return f"Erreur d'appel à l'IA : {str(e)}"
+        return ""
+
+
+def call_llm(prompt: str, system_prompt: str = None) -> str:
+    """Ollama first (local/offline), falls back to Grok if configured."""
+    result = call_ollama(prompt, system_prompt)
+    if result:
+        return result
+    result = call_grok_api(prompt, system_prompt)
+    if result:
+        return result
+    return f"Explication non disponible. Données : {prompt}"
 
 
 # --- Entraînement d'un modèle Isolation Forest ---
@@ -160,6 +182,7 @@ def detect_anomalies_for_olt(olt_id, model_id=None):
     from .models import MLModel, AnomalyDetection, InferenceLog
     from apps.snmp_collector.models import MetricHistory
     from apps.equipements.models import OLT
+    from django.conf import settings
     import joblib
     import time
 
@@ -168,6 +191,42 @@ def detect_anomalies_for_olt(olt_id, model_id=None):
         olt = OLT.objects.get(id=olt_id)
     except OLT.DoesNotExist:
         logger.error("OLT %s introuvable", olt_id)
+        return
+
+    # ── Simulation mode: detect anomalies from recent metric thresholds ───────
+    if getattr(settings, 'SIMULATION_MODE', False):
+        since = timezone.now() - timedelta(minutes=10)
+        recent = MetricHistory.objects.filter(
+            olt=olt, timestamp__gte=since, numeric_value__isnull=False
+        ).select_related('oid')
+
+        checks = [
+            ('cpu_usage',    80.0, 'high',   'CPU usage spike detected'),
+            ('memory_usage', 84.0, 'medium', 'Memory usage above threshold'),
+            ('temperature',  62.0, 'high',   'High temperature detected'),
+        ]
+
+        for oid_frag, threshold, severity, description in checks:
+            hit = recent.filter(oid__name__icontains=oid_frag).order_by('-timestamp').first()
+            if not hit or hit.numeric_value <= threshold:
+                continue
+            # Avoid duplicate within last 5 minutes
+            already = AnomalyDetection.objects.filter(
+                olt=olt, metric_name__icontains=oid_frag,
+                detected_at__gte=timezone.now() - timedelta(minutes=5)
+            ).exists()
+            if already:
+                continue
+            AnomalyDetection.objects.create(
+                olt=olt,
+                metric_name=oid_frag,
+                actual_value=round(hit.numeric_value, 2),
+                anomaly_score=round(min((hit.numeric_value - threshold) / threshold + 0.6, 1.0), 2),
+                severity=severity,
+                description=f"{description} on {olt.hostname}: {hit.numeric_value:.1f}",
+                resolved=False,
+            )
+            logger.info("[SIM] Anomaly created: %s=%.1f on %s", oid_frag, hit.numeric_value, olt.hostname)
         return
 
     # Récupérer le modèle actif pour le type 'isolation_forest' ou spécifié
@@ -231,10 +290,15 @@ def detect_anomalies_for_olt(olt_id, model_id=None):
                     # Ici on prend la première feature
                     actual_value = values[features[0]]
                     explanation = f"Détection d'anomalie par {model_obj.name} (score={anomaly_score:.2f})"
-                    # Optionnel : appeler Grok pour une explication
-                    if getattr(settings, 'GROK_API_KEY', None):
-                        grok_prompt = f"Explique cette anomalie sur l'OLT {olt.hostname}: la métrique {features[0]} a une valeur de {actual_value} alors que la normale est autour de ... (score d'anomalie {anomaly_score:.2f})"
-                        explanation += " " + call_grok_api(grok_prompt)
+                    llm_prompt = (
+                        f"Explique cette anomalie réseau sur l'OLT {olt.hostname}: "
+                        f"la métrique '{features[0]}' a une valeur de {actual_value} "
+                        f"avec un score d'anomalie de {anomaly_score:.2f} (1=anomalie critique). "
+                        f"Donne une cause probable et une action recommandée en 2-3 phrases."
+                    )
+                    llm_explanation = call_llm(llm_prompt)
+                    if llm_explanation:
+                        explanation = llm_explanation
                     AnomalyDetection.objects.create(
                         olt=olt,
                         metric_name=features[0],
@@ -296,14 +360,14 @@ def predict_metric(olt_id, metric_name, horizon_hours=24):
             return
 
         df = pd.DataFrame(list(metrics), columns=['ds', 'y'])
-        df['ds'] = pd.to_datetime(df['ds'])
+        df['ds'] = pd.to_datetime(df['ds']).dt.tz_localize(None)
 
         # Utiliser Prophet
         model = Prophet()
         model.fit(df)
 
         # Créer un dataframe futur
-        future = model.make_future_dataframe(periods=horizon_hours, freq='H')
+        future = model.make_future_dataframe(periods=horizon_hours, freq='h')
         forecast = model.predict(future)
 
         # Enregistrer les prédictions futures

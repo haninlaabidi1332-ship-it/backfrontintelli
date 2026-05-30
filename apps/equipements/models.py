@@ -529,31 +529,25 @@ class ONT(SoftDeleteModel):
     )
     ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="Adresse IP")
 
-    # Rattachement réseau (sans circularité)
     olt = models.ForeignKey(OLT, on_delete=models.PROTECT, related_name='onts', verbose_name="OLT")
     gpon_port = models.ForeignKey(GponPort, on_delete=models.SET_NULL, null=True, blank=True, related_name='onts', verbose_name="Port GPON")
     ont_index = models.IntegerField(null=True, blank=True, help_text="Index sur le port GPON", verbose_name="Index ONT")
 
-    # Optique
     rx_power = models.FloatField(null=True, blank=True, help_text="dBm – puissance reçue", verbose_name="Puissance RX (dBm)")
     tx_power = models.FloatField(null=True, blank=True, help_text="dBm – puissance émise", verbose_name="Puissance TX (dBm)")
     distance_km = models.FloatField(null=True, blank=True, verbose_name="Distance (km)")
     attenuation_db = models.FloatField(null=True, blank=True, verbose_name="Atténuation (dB)")
 
-    # Matériel
     vendor = models.ForeignKey(Vendor, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Fabricant")
     model = models.CharField(max_length=100, blank=True, verbose_name="Modèle")
     firmware_version = models.CharField(max_length=50, blank=True, verbose_name="Version firmware")
 
-    # État
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.UNKNOWN, db_index=True, verbose_name="Statut")
     last_seen_at = models.DateTimeField(null=True, blank=True, verbose_name="Dernière apparition")
 
-    # Client
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='onts', verbose_name="Client")
     service_type = models.CharField(max_length=20, choices=ServiceType.choices, default=ServiceType.RESIDENTIAL, verbose_name="Type de service")
 
-    # Localisation (adresse client)
     address = models.TextField(blank=True, verbose_name="Adresse client")
     city = models.CharField(max_length=100, blank=True, verbose_name="Ville")
     latitude = models.FloatField(null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)], verbose_name="Latitude")

@@ -51,68 +51,116 @@ class KPIViewSet(viewsets.ReadOnlyModelViewSet):
         cache_key = "analytics:kpi:current"
         data = cache.get(cache_key)
         if not data:
-            from apps.equipements.models import OLT, ONT
+            from apps.equipements.models import OLT, Site
             from apps.snmp_collector.models import MetricHistory, SnmpOID, PollJob
             from apps.bfd_monitor.models import BFDSession
             from apps.alerting.models import Alert
             from apps.ai_engine.models import AnomalyDetection
+            from .models import NetworkDevice
 
-            now      = timezone.now()
+            now       = timezone.now()
             since_24h = now - timedelta(hours=24)
+            since_1h  = now - timedelta(hours=1)
 
+            # OLTs
             total_olts  = OLT.objects.count()
             active_olts = OLT.objects.filter(status='active').count()
-            total_onts  = ONT.objects.count()
-            online_onts = ONT.objects.filter(status='online').count()
+            degraded_olts = OLT.objects.filter(status='degraded').count()
 
-            cpu_oid = SnmpOID.objects.filter(name='cpu_usage').first()
+            # Sites / branches
+            total_sites     = Site.objects.count()
+            # A site is reachable if it has at least one active/degraded OLT
+            reachable_sites = Site.objects.filter(
+                olts__status__in=['active', 'degraded']
+            ).distinct().count()
+
+            # Average SNMP metrics (last hour)
+            cpu_oid = SnmpOID.objects.filter(name__icontains='cpu').first()
             avg_cpu = (
                 MetricHistory.objects
-                .filter(oid=cpu_oid, timestamp__gte=since_24h)
+                .filter(oid=cpu_oid, timestamp__gte=since_1h)
                 .aggregate(v=Avg('numeric_value'))['v']
                 if cpu_oid else None
             )
-            mem_oid = SnmpOID.objects.filter(name='memory_usage').first()
+            mem_oid = SnmpOID.objects.filter(name__icontains='mem').first()
             avg_mem = (
                 MetricHistory.objects
-                .filter(oid=mem_oid, timestamp__gte=since_24h)
+                .filter(oid=mem_oid, timestamp__gte=since_1h)
                 .aggregate(v=Avg('numeric_value'))['v']
                 if mem_oid else None
             )
+            rx_oid = SnmpOID.objects.filter(name__icontains='rx').first()
+            avg_rx = (
+                MetricHistory.objects
+                .filter(oid=rx_oid, timestamp__gte=since_1h)
+                .aggregate(v=Avg('numeric_value'))['v']
+                if rx_oid else None
+            )
 
+            # SNMP poll success rate (last 24h)
             total_jobs   = PollJob.objects.filter(created_at__gte=since_24h).count()
             success_jobs = PollJob.objects.filter(created_at__gte=since_24h, state='success').count()
             snmp_rate    = round(success_jobs / total_jobs * 100, 1) if total_jobs else 100.0
 
+            # BFD / WAN sessions
             bfd_total = BFDSession.objects.filter(is_monitored=True).count()
             bfd_up    = BFDSession.objects.filter(is_monitored=True, state='up').count()
+            bfd_pct   = round(bfd_up / bfd_total * 100, 1) if bfd_total else 100.0
 
+            # Alerts & anomalies
             alert_count   = Alert.objects.filter(status='active').count()
             anomaly_count = AnomalyDetection.objects.filter(
                 resolved=False, detected_at__gte=since_24h
             ).count()
 
+            # Per-site breakdown
+            sites_data = []
+            for site in Site.objects.prefetch_related('olts'):
+                site_olts = site.olts.all()
+                site_active = site_olts.filter(status='active').count()
+                site_total  = site_olts.count()
+                last_poll   = site_olts.filter(
+                    last_polled_at__isnull=False
+                ).order_by('-last_polled_at').values_list('last_polled_at', flat=True).first()
+                sites_data.append({
+                    'id':           str(site.id),
+                    'name':         site.name,
+                    'total_olts':   site_total,
+                    'active_olts':  site_active,
+                    'reachable':    site_active > 0,
+                    'last_seen':    last_poll.isoformat() if last_poll else None,
+                })
+
             data = {
+                # OLT fleet
                 'total_olts':         total_olts,
                 'active_olts':        active_olts,
-                'total_onts':         total_onts,
-                'online_onts':        online_onts,
+                'degraded_olts':      degraded_olts,
+                # Sites / branches
+                'total_sites':        total_sites,
+                'reachable_sites':    reachable_sites,
+                'sites':              sites_data,
+                # Performance
                 'avg_cpu_usage':      round(avg_cpu, 1) if avg_cpu is not None else None,
                 'avg_memory_usage':   round(avg_mem, 1) if avg_mem is not None else None,
+                'avg_rx_power':       round(avg_rx, 2)  if avg_rx  is not None else None,
                 'snmp_success_rate':  snmp_rate,
+                # WAN / BFD
                 'bfd_up_sessions':    bfd_up,
                 'bfd_total_sessions': bfd_total,
+                'bfd_availability':   bfd_pct,
+                # Incidents
                 'alert_count':        alert_count,
                 'anomaly_count':      anomaly_count,
             }
-            cache.set(cache_key, data, 300)
+            cache.set(cache_key, data, 60)
         return Response(data)
 
     @extend_schema(summary="Tendance sur N jours — [{timestamp, value}]")
     @action(detail=False, methods=['get'], url_path='trend')
     def trend(self, request):
         days   = int(request.query_params.get('days', 7))
-        metric = request.query_params.get('metric', 'online_onts')
+        metric = request.query_params.get('metric', 'active_olts')
         since  = timezone.now() - timedelta(days=days)
         qs = (
             KPIHistory.objects
