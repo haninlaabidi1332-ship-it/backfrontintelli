@@ -1,0 +1,160 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Theme variables ───────────────────────────────────────── */
+:root {
+  --bg-base:        #f0f5fb;
+  --bg-sidebar:     #ffffff;
+  --bg-header:      rgba(255,255,255,0.90);
+  --bg-card:        #ffffff;
+  --bg-card-hover:  #f1f5f9;
+  --bg-input:       #f1f5f9;
+  --border:         #e2e8f0;
+  --border-hover:   #94a3b8;
+  --text-primary:   #0f172a;
+  --text-secondary: #334155;
+  --text-muted:     #64748b;
+  --scrollbar:      #cbd5e1;
+  --scrollbar-hover:#94a3b8;
+  --shadow:         0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-lg:      0 4px 16px rgba(0,0,0,0.1);
+}
+
+html.dark {
+  --bg-base:        #050b1a;
+  --bg-sidebar:     rgba(255,255,255,0.03);
+  --bg-header:      rgba(5,11,26,0.85);
+  --bg-card:        rgba(255,255,255,0.05);
+  --bg-card-hover:  rgba(255,255,255,0.08);
+  --bg-input:       rgba(255,255,255,0.05);
+  --border:         rgba(255,255,255,0.10);
+  --border-hover:   rgba(255,255,255,0.20);
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --scrollbar:      rgba(255,255,255,0.20);
+  --scrollbar-hover:rgba(255,255,255,0.30);
+  --shadow:         none;
+  --shadow-lg:      none;
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+@layer base {
+  html {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    scroll-behavior: smooth;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  * { border-color: var(--border); }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+}
+
+/* ── Components ────────────────────────────────────────────── */
+@layer components {
+
+  .glass-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow);
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-200;
+  }
+  .glass-card-hover:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .stat-card { @apply glass-card p-5 flex flex-col gap-3; }
+
+  .btn-primary {
+    @apply bg-primary text-slate-900 font-semibold px-4 py-2 rounded-xl
+           hover:bg-primary-400 active:scale-95 transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-primary/50;
+  }
+
+  .btn-ghost {
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    @apply px-4 py-2 rounded-xl active:scale-95 transition-all duration-150;
+  }
+  .btn-ghost:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+  }
+
+  .nav-item {
+    color: var(--text-muted);
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150;
+  }
+  .nav-item:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+  .nav-item-active { @apply bg-primary/15 text-primary border border-primary/20; }
+
+  .badge { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold; }
+  .badge-success { @apply badge bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30; }
+  .badge-warning { @apply badge bg-amber-500/20  text-amber-700  dark:text-amber-400  border border-amber-500/30; }
+  .badge-danger  { @apply badge bg-red-500/20    text-red-700    dark:text-red-400    border border-red-500/30; }
+  .badge-info    { @apply badge bg-primary/20    text-primary    border border-primary/30; }
+  .badge-neutral { @apply badge bg-slate-500/20  text-slate-700  dark:text-slate-400  border border-slate-500/30; }
+
+  .table-header {
+    color: var(--text-muted);
+    @apply text-xs font-semibold uppercase tracking-wider px-4 py-3;
+  }
+  .table-cell {
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    @apply px-4 py-3 text-sm;
+  }
+
+  html.dark .glow-cyan  { box-shadow: 0 0 20px rgba(0,212,255,0.15), 0 0 40px rgba(0,212,255,0.05); }
+  html.dark .glow-green { box-shadow: 0 0 20px rgba(52,211,153,0.15); }
+  html.dark .glow-red   { box-shadow: 0 0 20px rgba(248,113,113,0.15); }
+}
+
+/* ── Light mode: global text legibility fixes ──────────────────
+   Pages use hardcoded Tailwind classes (text-white, text-slate-300…).
+   These overrides remap them to dark readable colors in light mode.  */
+html:not(.dark) .text-white          { color: #0f172a; }
+html:not(.dark) .text-slate-100      { color: #0f172a; }
+html:not(.dark) .text-slate-200      { color: #1e293b; }
+html:not(.dark) .text-slate-300      { color: #334155; }
+html:not(.dark) .text-slate-400      { color: #475569; }
+html:not(.dark) .text-slate-500      { color: #475569; }
+html:not(.dark) .text-slate-600      { color: #334155; }
+
+/* Hover states */
+html:not(.dark) .hover\:text-white:hover { color: #0f172a; }
+
+/* Transparent white backgrounds become opaque white cards in light mode */
+html:not(.dark) .bg-white\/5,
+html:not(.dark) .bg-white\/\[0\.03\],
+html:not(.dark) .bg-white\/\[0\.02\]   { background-color: #ffffff; }
+
+html:not(.dark) .bg-white\/10,
+html:not(.dark) .hover\:bg-white\/10:hover { background-color: #f1f5f9; }
+
+html:not(.dark) .hover\:bg-white\/\[0\.02\]:hover { background-color: #f8fafc; }
+
+/* White/transparent borders → slate borders */
+html:not(.dark) .border-white\/10,
+html:not(.dark) .border-white\/5      { border-color: #e2e8f0; }
+html:not(.dark) .divide-white\/5 > * + * { border-color: #e2e8f0; }
+
+/* Skeleton loaders */
+html:not(.dark) .bg-white\/\[0\.05\]  { background-color: #f1f5f9; }

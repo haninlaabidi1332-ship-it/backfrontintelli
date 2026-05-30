@@ -1,0 +1,9 @@
+{
+  "pid": 6276,
+  "startedAt": 1779760784954,
+  "command": "dev",
+  "cwd": "/home/user/IntelliOLT/IntelliOLT_frontend_vue",
+  "port": 3000,
+  "hostname": "0.0.0.0",
+  "url": "http://0.0.0.0:3000"
+}
